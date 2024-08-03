@@ -3,6 +3,7 @@ import chess
 import tqdm
 import cv2
 import numpy as np
+import math
 
 MATE_SCORE = 100_000
 MAX_MATE = 99
@@ -64,6 +65,17 @@ sf = stockfish.Stockfish(
     }
 )
 
+def is_black_turn(bd: chess.Board) -> bool:
+    return bd.fen().split()[1] == "b"
+
+def clamp(n, smallest, largest):
+    return max(smallest, min(n, largest))
+
+def winrate(bd: chess.Board) -> int:
+    m = min(240, len(bd.move_stack)) / 64
+    
+    return 0.5 + math.tanh(get_ev(bd) * 0.2) * 0.5
+
 def eval2str(ev: float) -> str:
     if abs(ev) < (MATE_SCORE - MAX_MATE) / 100:
         return F"{ev :+06.02f}"
@@ -75,7 +87,7 @@ def eval2str(ev: float) -> str:
         return F"-M{round(MATE_SCORE + ev * 100)}"
 
 def draw_chessboard(bd: chess.Board, lastmove: None | str=None):
-    img = np.zeros((880, 880, 3), dtype=np.uint8)
+    img = np.zeros((880, 920, 3), dtype=np.uint8)
     
     for i in range(8):
         for j in range(8):
@@ -92,9 +104,11 @@ def draw_chessboard(bd: chess.Board, lastmove: None | str=None):
             5,
         )
 
+    img[round((1 - winrate(bd)) * 880):, 880:920, :] = [255, 255, 255]
+
     img = cv2.resize(img, (BOARD_SIZE, BOARD_SIZE))
             
-    cv2.imwrite(F"examples/board_example_{len(bd.move_stack)}.png", img)
+    cv2.imwrite("board.png", img)
 
     cv2.imshow(F"board", img)
     cv2.waitKey(1)
@@ -122,7 +136,7 @@ def _get_ev(bd: chess.Board, turn: bool) -> float:
 
     return parse_eval(sf.get_evaluation(), turn)
 
-def get_ev(bd: chess.Board, turn: bool) -> float:
+def get_ev(bd: chess.Board) -> float:
     global move_cache
 
     cv2.waitKey(1)
@@ -131,7 +145,7 @@ def get_ev(bd: chess.Board, turn: bool) -> float:
         return move_cache[bd.fen()]
     
     else:
-        ev = _get_ev(bd, turn)
+        ev = _get_ev(bd, not is_black_turn(bd))
         move_cache[bd.fen()] = ev
         return ev
     
@@ -162,7 +176,7 @@ def best_move_with_piece(bd: chess.Board, p: str, rv: bool) -> chess.Move:
 
     for i in tqdm.tqdm(get_moves_with_piece(bd, p)):
         bd.push(i)
-        moves.append((i, get_ev(bd, rv)))
+        moves.append((i, get_ev(bd)))
         bd.pop()
 
     moves.sort(key=lambda x: -x[1], reverse=rv)
@@ -209,4 +223,11 @@ def fight(white: str, black: str):
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    ...
+    bd = chess.Board()
+
+    print(winrate(bd))
+
+    bd.push(chess.Move.from_uci("e2e4"))
+    bd.push(chess.Move.from_uci("e7e5"))
+
+    print(winrate(bd))
