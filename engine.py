@@ -169,7 +169,7 @@ def best_move_with_piece(bd: chess.Board, p: str, rv: bool) -> chess.Move:
     moves = []
     m = get_moves_with_piece(bd, p)
     
-    print(F"{'Black' if rv else 'White'} has to move: {piece_to_name.get(p.upper())}")
+    print(F"({len(bd.move_stack)}) {'Black' if rv else 'White'} has to move: {piece_to_name.get(p.upper())}")
 
     if len(m) == 0:
         return None
